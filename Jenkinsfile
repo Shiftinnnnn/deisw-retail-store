@@ -9,12 +9,12 @@ pipeline {
     environment {
         REGISTRY_USER = "sebastiannnn"
         STUDENT_CODE  = "u202310199"
-        IMAGE_NAME    = "retail-store-${STUDENT_CODE}"
+        IMAGE_NAME    = "retail-store-u202310199"
         TAG           = "${env.BUILD_NUMBER}"
     }
 
     stages {
-        stage('Compile Project') {
+        stage('1. Compile Project') {
             steps {
                 withMaven(maven: 'MAVEN_3_9_16') {
                     sh 'mvn clean compile'
@@ -22,7 +22,7 @@ pipeline {
             }
         }
 
-        stage('Validate Checkstyle') {
+        stage('2. Validate Checkstyle') {
             steps {
                 withMaven(maven: 'MAVEN_3_9_16') {
                     sh 'mvn checkstyle:check'
@@ -30,7 +30,7 @@ pipeline {
             }
         }
 
-        stage('Validate Unit Tests') {
+        stage('3. Validate Unit Tests') {
             steps {
                 withMaven(maven: 'MAVEN_3_9_16') {
                     sh 'mvn test'
@@ -38,7 +38,7 @@ pipeline {
             }
         }
 
-        stage('Validate Test Coverage') {
+        stage('4. Validate Test Coverage') {
             steps {
                 withMaven(maven: 'MAVEN_3_9_16') {
                     sh 'mvn clean verify jacoco:report'
@@ -47,11 +47,16 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('5. SonarQube Analysis') {
             steps {
                 withMaven(maven: 'MAVEN_3_9_16') {
                     withSonarQubeEnv('MiSonarServer') {
-                        sh 'mvn clean verify sonar:sonar -Dsonar.projectKey=deisw-language-reference'
+                        sh '''
+                            mvn clean verify sonar:sonar \
+                            -Dsonar.projectKey=deisw-language-reference \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN
+                        '''
                     }
                 }
 
@@ -67,7 +72,7 @@ pipeline {
             }
         }
 
-        stage('Construir y Publicar Imagen Docker') {
+        stage('6. Construir y Publicar Imagen Docker') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -80,11 +85,12 @@ pipeline {
                         echo "Iniciando sesión en Docker Hub..."
                         sh "echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin"
 
-                        echo "Construyendo y publicando imagen Docker..."
+                        echo "Construyendo imagen optimizada AMD64..."
                         sh """
                             docker buildx build \
                             --platform linux/amd64 \
                             -t ${REGISTRY_USER}/${IMAGE_NAME}:${TAG} \
+                            -t ${REGISTRY_USER}/${IMAGE_NAME}:latest \
                             --push .
                         """
                     }
